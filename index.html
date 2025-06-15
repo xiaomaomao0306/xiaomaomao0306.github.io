@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互動式圖片音訊故事書</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden; /* 隱藏滾動條 */
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f0f0f0;
+            user-select: none; /* 防止滑動時選取文字 */
+            -webkit-user-select: none; /* 針對 Safari */
+            -moz-user-select: none; /* 針對 Firefox */
+            -ms-user-select: none; /* 針對 IE/Edge */
+        }
+
+        .page-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            transition: transform 0.5s ease-in-out; /* 平滑過渡效果 */
+            touch-action: pan-y; /* 允許垂直滾動，防止瀏覽器預設的水平滑動行為 */
+        }
+
+        .page {
+            flex-shrink: 0; /* 防止頁面縮小 */
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .image-wrapper {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        .image-box {
+            flex: 1; /* 讓圖片平均分配空間 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden; /* 確保圖片不超出 */
+            cursor: pointer;
+            position: relative; /* 用於音訊圖示定位 */
+        }
+
+        .image-box img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain; /* 保持圖片比例並適應容器 */
+        }
+
+        .nav-button {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            font-size: 1.5em;
+            cursor: pointer;
+            z-index: 100; /* 確保按鈕在最上層 */
+            border-radius: 5px;
+            opacity: 0.8; /* 預設透明度 */
+            transition: opacity 0.2s;
+        }
+
+        .nav-button:hover {
+            opacity: 1; /* 滑鼠懸停時完全不透明 */
+        }
+
+        #prevBtn {
+            left: 10px;
+        }
+
+        #nextBtn {
+            right: 10px;
+        }
+
+        #pageIndicator {
+            position: absolute;
+            bottom: 10px;
+            background-color: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 1em;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="page-container" id="pageContainer">
+        <!-- 頁面會由 JavaScript 動態生成 -->
+    </div>
+
+    <button id="prevBtn" class="nav-button">❮</button>
+    <button id="nextBtn" class="nav-button">❯</button>
+
+    <div id="pageIndicator">頁面 1 / 10</div>
+
+    <script>
+        const totalPages = 10; // 總頁數
+        let currentPage = 0; // 當前頁面索引 (從 0 開始)
+        const pageContainer = document.getElementById('pageContainer');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const pageIndicator = document.getElementById('pageIndicator');
+
+        // 預設圖片和音訊路徑
+        // 您需要確保 'images/' 和 'audio/' 資料夾存在，且檔案命名符合以下格式。
+        const resources = Array.from({ length: totalPages }, (_, i) => ({
+            leftImage: `images/page${i + 1}_left.jpg`,
+            leftAudio: `audio/page${i + 1}_left.mp3`,
+            rightImage: `images/page${i + 1}_right.jpg`,
+            rightAudio: `audio/page${i + 1}_right.mp3`
+        }));
+
+        let currentPlayingAudio = null; // 追蹤當前正在播放的音訊
+
+        // 創建所有頁面
+        function createPages() {
+            resources.forEach((res, index) => {
+                const page = document.createElement('div');
+                page.classList.add('page');
+                page.dataset.pageIndex = index; // 設定頁面索引
+
+                const imageWrapper = document.createElement('div');
+                imageWrapper.classList.add('image-wrapper');
+
+                // 左邊圖片容器
+                const leftBox = document.createElement('div');
+                leftBox.classList.add('image-box');
+                const leftImg = document.createElement('img');
+                leftImg.src = res.leftImage;
+                leftImg.alt = `第 ${index + 1} 頁左邊圖片`; // 無障礙用途
+                const leftAudio = new Audio(res.leftAudio);
+                leftBox.appendChild(leftImg);
+                leftBox.onclick = () => playAudio(leftAudio); // 點擊播放音訊
+                imageWrapper.appendChild(leftBox);
+
+                // 右邊圖片容器
+                const rightBox = document.createElement('div');
+                rightBox.classList.add('image-box');
+                const rightImg = document.createElement('img');
+                rightImg.src = res.rightImage;
+                rightImg.alt = `第 ${index + 1} 頁右邊圖片`; // 無障礙用途
+                const rightAudio = new Audio(res.rightAudio);
+                rightBox.appendChild(rightImg);
+                rightBox.onclick = () => playAudio(rightAudio); // 點擊播放音訊
+                imageWrapper.appendChild(rightBox);
+
+                page.appendChild(imageWrapper);
+                pageContainer.appendChild(page);
+            });
+        }
+
+        // 播放音訊的函數
+        function playAudio(audioElement) {
+            // 如果有其他音訊正在播放，則停止並重置它
+            if (currentPlayingAudio && currentPlayingAudio !== audioElement) {
+                currentPlayingAudio.pause();
+                currentPlayingAudio.currentTime = 0;
+            }
+            // 播放點擊的音訊
+            audioElement.play();
+            currentPlayingAudio = audioElement; // 更新當前播放的音訊
+        }
+
+        // 更新頁面顯示 (透過 CSS transform 實現平滑滑動)
+        function updatePageDisplay() {
+            pageContainer.style.transform = `translateX(-${currentPage * 100}vw)`;
+            pageIndicator.textContent = `頁面 ${currentPage + 1} / ${totalPages}`;
+
+            // 切換頁面時，停止所有正在播放的音訊
+            const allAudios = document.querySelectorAll('audio');
+            allAudios.forEach(audio => {
+                audio.pause();
+                audio.currentTime = 0;
+            });
+            currentPlayingAudio = null; // 重置當前播放音訊標記
+        }
+
+        // 導航到上一頁
+        function goToPrevPage() {
+            if (currentPage > 0) {
+                currentPage--;
+                updatePageDisplay();
+            }
+        }
+
+        // 導航到下一頁
+        function goToNextPage() {
+            if (currentPage < totalPages - 1) {
+                currentPage++;
+                updatePageDisplay();
+            }
+        }
+
+        // 監聽導航按鈕點擊事件
+        prevBtn.addEventListener('click', goToPrevPage);
+        nextBtn.addEventListener('click', goToNextPage);
+
+        // --- 模擬滑動功能 (支援觸控和滑鼠拖曳) ---
+        let startX;
+        let isSwiping = false;
+        let currentTranslate = 0;
+
+        // 觸控開始
+        pageContainer.addEventListener('touchstart', (e) => {
+            startX = e.touches[0].clientX;
+            isSwiping = true;
+            // 暫停過渡效果，以便即時跟隨手指移動
+            pageContainer.style.transition = 'none';
+        });
+
+        // 觸控移動
+        pageContainer.addEventListener('touchmove', (e) => {
+            if (!isSwiping) return;
+            const currentX = e.touches[0].clientX;
+            const diffX = currentX - startX;
+            // 計算當前拖曳位置，使頁面跟隨手指移動
+            pageContainer.style.transform = `translateX(calc(-${currentPage * 100}vw + ${diffX}px))`;
+        });
+
+        // 觸控結束
+        pageContainer.addEventListener('touchend', (e) => {
+            if (!isSwiping) return;
+            const endX = e.changedTouches[0].clientX;
+            const diffX = endX - startX;
+            isSwiping = false;
+            // 恢復過渡效果
+            pageContainer.style.transition = 'transform 0.5s ease-in-out';
+
+            // 判斷滑動方向和距離
+            if (Math.abs(diffX) > 75) { // 設定一個閾值 (例如 75px) 來判斷是否是有效滑動
+                if (diffX > 0) { // 向右滑動 (往上一頁)
+                    goToPrevPage();
+                } else { // 向左滑動 (往下一頁)
+                    goToNextPage();
+                }
+            } else {
+                // 如果滑動距離不足，則回到當前頁面
+                updatePageDisplay();
+            }
+        });
+
+        // 初始化頁面：創建所有頁面元素並顯示第一頁
+        createPages();
+        updatePageDisplay();
+
+    </script>
+</body>
+</html>
